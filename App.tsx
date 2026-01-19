@@ -5,15 +5,88 @@ import FinalReport from './components/FinalReport';
 import DebatePanel from './components/DebatePanel';
 import { CompetitorPanel, HedgingPanel } from './components/ExtraPanels';
 import { useAgentOrchestrator } from './services/orchestrator';
-import { GitMerge, Languages } from 'lucide-react';
+import { GitMerge, Share2, Loader2, Download } from 'lucide-react';
 import { Language } from './types';
+import html2canvas from 'html2canvas';
 
 export default function App() {
   const { state, runPipeline } = useAgentOrchestrator();
   const [language, setLanguage] = useState<Language>('EN');
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleSearch = (ticker: string) => {
     runPipeline(ticker, language);
+  };
+
+  const handleExport = async () => {
+    const element = document.getElementById('full-report-container');
+    if (!element) return;
+
+    setIsExporting(true);
+    
+    // Slight delay to allow UI to settle
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    try {
+        const canvas = await html2canvas(element, {
+            backgroundColor: '#020617', // Match app background (slate-950)
+            scale: 2, // Retina quality
+            useCORS: true,
+            logging: false,
+            onclone: (clonedDoc) => {
+                // 1. Hide the export button in the screenshot
+                const btn = clonedDoc.getElementById('global-export-btn');
+                if (btn) btn.style.display = 'none';
+
+                // 2. Fix Glassmorphism for screenshot
+                const panels = clonedDoc.querySelectorAll('.glass-panel');
+                panels.forEach((panel) => {
+                    const p = panel as HTMLElement;
+                    p.style.background = '#1e293b'; // Solid slate-800
+                    p.style.backdropFilter = 'none';
+                    p.style.border = '1px solid #334155'; // slate-700
+                    p.style.boxShadow = 'none';
+                });
+            }
+        });
+        
+        canvas.toBlob(async (blob) => {
+            if (!blob) return;
+
+            const decision = state.judge.data?.decision || 'REPORT';
+            const fileName = `AlphaAgent_${state.stock?.ticker}_${decision}_${new Date().toISOString().split('T')[0]}.png`;
+            const file = new File([blob], fileName, { type: 'image/png' });
+
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        title: `AlphaAgent: ${state.stock?.ticker}`,
+                        text: `AI Analysis for ${state.stock?.ticker} - ${decision}`,
+                        files: [file]
+                    });
+                } catch (err) {
+                     if ((err as Error).name !== 'AbortError') {
+                        downloadBlob(blob, fileName);
+                    }
+                }
+            } else {
+                downloadBlob(blob, fileName);
+            }
+        });
+
+    } catch (err) {
+        console.error("Export failed", err);
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
+  const downloadBlob = (blob: Blob, fileName: string) => {
+      const link = document.createElement('a');
+      link.download = fileName;
+      link.href = URL.createObjectURL(blob);
+      link.click();
+      URL.revokeObjectURL(link.href);
   };
 
   return (
@@ -78,19 +151,32 @@ export default function App() {
 
         {/* Pipeline Visualization (Only show if running or has run) */}
         {(state.isRunning || state.stock) && (
-          <div className="space-y-8 animate-in fade-in duration-500">
+          <div id="full-report-container" className="space-y-8 animate-in fade-in duration-500 p-4 -m-4">
             
             {/* Status Bar */}
             <div className="flex items-center justify-between text-xs font-mono text-slate-500 border-b border-slate-800 pb-2">
                <div>TARGET: <span className="text-emerald-400">{state.stock?.ticker}</span></div>
-               <div className="flex gap-4">
+               <div className="flex gap-4 items-center">
                   <span className={state.isRunning ? 'text-emerald-400 animate-pulse' : ''}>
                     {state.isRunning ? '>> ORCHESTRATING AGENTS...' : '>> ANALYSIS COMPLETE'}
                   </span>
+                  
+                  {/* Global Export Button - Only show when analysis is done */}
+                  {!state.isRunning && state.judge.status === 'success' && (
+                      <button 
+                        id="global-export-btn"
+                        onClick={handleExport}
+                        disabled={isExporting}
+                        className="flex items-center gap-2 ml-4 px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 transition-all"
+                      >
+                         {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Share2 className="w-3 h-3" />}
+                         {isExporting ? 'CAPTURING...' : 'SHARE REPORT'}
+                      </button>
+                  )}
                </div>
             </div>
 
-            {/* Row 0: Synthesis Layer (Judge) - MOVED TO TOP */}
+            {/* Row 0: Synthesis Layer (Judge) */}
             {state.judge.status !== 'pending' && (
                 <div className="relative mb-12">
                      <div className="flex justify-center my-4">

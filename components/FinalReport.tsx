@@ -1,14 +1,12 @@
-import React, { useState } from 'react';
-import { JudgeOutput, Decision } from '../types';
-import { ShieldAlert, TrendingUp, AlertTriangle, Target, Download, Loader2 } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import React from 'react';
+import { JudgeOutput } from '../types';
+import { TrendingUp, AlertTriangle, Target } from 'lucide-react';
 
 interface FinalReportProps {
   data: JudgeOutput;
 }
 
 const FinalReport: React.FC<FinalReportProps> = ({ data }) => {
-  const [isExporting, setIsExporting] = useState(false);
   const scorePercentage = Math.round(data.confidence * 100);
 
   // Calculate percentages for the range bar
@@ -22,45 +20,9 @@ const FinalReport: React.FC<FinalReportProps> = ({ data }) => {
   const currentPos = getPos(currentPrice);
   const targetPos = getPos(targetPrice);
 
-  const handleExport = async () => {
-    const element = document.getElementById('final-report-container');
-    if (!element) return;
-
-    setIsExporting(true);
-    try {
-        const canvas = await html2canvas(element, {
-            backgroundColor: '#0f172a', // Match bg-slate-900
-            scale: 2, // Higher resolution
-            useCORS: true,
-            logging: false,
-        });
-        
-        const link = document.createElement('a');
-        link.download = `AlphaAgent_Report_${new Date().toISOString().split('T')[0]}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    } catch (err) {
-        console.error("Export failed", err);
-    } finally {
-        setIsExporting(false);
-    }
-  };
-
   return (
-    <div id="final-report-container" className="mt-8 grid grid-cols-1 md:grid-cols-12 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 relative group">
+    <div className="mt-8 grid grid-cols-1 md:grid-cols-12 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 relative group">
       
-      {/* Export Button */}
-      <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-         <button 
-            onClick={handleExport}
-            disabled={isExporting}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-mono text-slate-300 transition-all"
-         >
-            {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-            {isExporting ? 'EXPORTING...' : 'EXPORT IMAGE'}
-         </button>
-      </div>
-
       {/* Main Decision Block */}
       <div className="md:col-span-4 glass-panel rounded-2xl p-8 flex flex-col items-center justify-center text-center border-t-4 border-t-slate-700 relative overflow-hidden">
         <div className={`absolute top-0 left-0 w-full h-1 ${
