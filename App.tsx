@@ -185,7 +185,10 @@ export default function App() {
                         </div>
                      </div>
                      {state.judge.status === 'success' && state.judge.data ? (
-                        <FinalReport data={state.judge.data} />
+                        <FinalReport 
+                            data={state.judge.data} 
+                            backtestData={state.backtest.status === 'success' ? state.backtest.data : undefined}
+                        />
                      ) : state.judge.status === 'error' ? (
                         <div className="text-center p-8 border border-rose-900/30 bg-rose-950/10 rounded-xl text-rose-400">
                             Judge Agent failed to synthesize report.

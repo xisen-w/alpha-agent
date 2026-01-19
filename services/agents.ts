@@ -7,6 +7,7 @@ import {
   CompetitorAgentOutput,
   DebateAgentOutput,
   HedgingAgentOutput,
+  BacktestAgentOutput,
   StockContext,
   Decision,
   Valuation,
@@ -37,12 +38,11 @@ export const runIndustryAgent = async (stock: StockContext, lang: Language): Pro
   };
 
   const prompt = `Analyze the industry and broader market outlook for ${stock.ticker}. 
-  1. Identify the specific sub-sector (e.g., "EVs in China" or "Cloud Computing in US").
-  2. IDENTIFY THE RELEVANT BROAD MARKET INDEX (e.g., S&P 500, HSI).
-  3. Analyze the current trend of that BROAD market index.
-  4. Analyze the SPECIFIC INDUSTRY growth dynamics (e.g., market size, CAGR, demand drivers, saturation).
-  5. Assess specific regulatory risks.
-  6. Provide a summary combining the broad market backdrop and specific industry dynamics.
+  1. Identify the specific sub-sector.
+  2. Analyze the current trend of the BROAD market index.
+  3. Analyze the SPECIFIC INDUSTRY growth dynamics.
+  4. Assess specific regulatory risks.
+  5. Provide a summary combining the broad market backdrop and specific industry dynamics.
   
   ${getLangInstruction(lang)}`;
 
@@ -112,6 +112,49 @@ export const runQuantAgent = async (stock: StockContext, lang: Language): Promis
     schema,
     "You are a Disciplined Quantitative Trader.",
     true
+  );
+};
+
+// --- Backtest Agent (The Reality Check) ---
+export const runBacktestAgent = async (stock: StockContext, lang: Language): Promise<BacktestAgentOutput> => {
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      score: { type: Type.NUMBER, description: "0-100 score of how well the past logic would have worked" },
+      bias: { type: Type.STRING, enum: ['Optimistic', 'Pessimistic', 'Neutral'] },
+      lessons: { type: Type.ARRAY, items: { type: Type.STRING } },
+      pastPrediction: { type: Type.STRING, description: "What the model would have predicted 3 months ago" }
+    },
+    required: ['score', 'bias', 'lessons', 'pastPrediction']
+  };
+
+  // Calculate the date 3 months ago
+  const now = new Date();
+  const threeMonthsAgo = new Date(now.setMonth(now.getMonth() - 3));
+  const dateStr = threeMonthsAgo.toISOString().split('T')[0];
+
+  const prompt = `Perform a REALITY CHECK backtest for ${stock.ticker}.
+  
+  TASK:
+  1. Use Google Search to find the stock price and major news specifically around ${dateStr} (3 months ago).
+  2. Pretend you are an analyst at that time (${dateStr}). Based ONLY on that past data, form a prediction.
+  3. Compare that past prediction to what actually happened today.
+  4. Did the market overreact? Did it miss a risk?
+  
+  OUTPUT:
+  - Score (0-100): How accurate was the hypothetical past prediction?
+  - Bias: Was the logic too Optimistic or Pessimistic?
+  - Lessons: 3 specific takeaways to improve today's analysis.
+  
+  ${getLangInstruction(lang)}`;
+
+  // Using MODEL_FAST + Search because reasoning models sometimes timeout on complex searches with strict JSON
+  return generateTypedResponse<BacktestAgentOutput>(
+    MODEL_FAST, 
+    prompt,
+    schema,
+    "You are a Backtesting Engine. You verify logic against historical reality.",
+    true // ENABLE SEARCH
   );
 };
 
@@ -187,7 +230,7 @@ export const runHedgingAgent = async (stock: StockContext, lang: Language): Prom
     prompt,
     schema,
     "You are a Risk Manager.",
-    false // No search needed for general hedging theory usually, but could be enabled. Keeping false for speed/reasoning.
+    false 
   );
 };
 
@@ -232,9 +275,10 @@ export const runJudgeAgent = async (
   industry: IndustryAgentOutput,
   news: NewsAgentOutput,
   quant: QuantAgentOutput,
-  competitor: CompetitorAgentOutput,
-  debate: DebateAgentOutput,
-  hedging: HedgingAgentOutput,
+  competitor: CompetitorAgentOutput | null,
+  debate: DebateAgentOutput | null,
+  hedging: HedgingAgentOutput | null,
+  backtest: BacktestAgentOutput | null,
   lang: Language
 ): Promise<JudgeOutput> => {
   const schema = {
@@ -243,6 +287,8 @@ export const runJudgeAgent = async (
       decision: { type: Type.STRING, enum: [Decision.BUY, Decision.HOLD, Decision.AVOID, Decision.WATCH] },
       confidence: { type: Type.NUMBER },
       valuation: { type: Type.STRING, enum: [Valuation.UNDERPRICED, Valuation.FAIR, Valuation.OVERPRICED, Valuation.UNKNOWN] },
+      marketConsensus: { type: Type.STRING, description: "What is already priced in/known by the market" },
+      uniqueInsight: { type: Type.STRING, description: "Contrarian or unique insight this analysis provides" },
       keyDrivers: { type: Type.ARRAY, items: { type: Type.STRING } },
       risks: { type: Type.ARRAY, items: { type: Type.STRING } },
       reasoning: { type: Type.STRING },
@@ -258,7 +304,7 @@ export const runJudgeAgent = async (
         required: ['currentPrice', 'targetPrice', 'bullCase', 'bearCase', 'timeframe']
       }
     },
-    required: ['decision', 'confidence', 'valuation', 'keyDrivers', 'risks', 'reasoning', 'forecast']
+    required: ['decision', 'confidence', 'valuation', 'marketConsensus', 'uniqueInsight', 'keyDrivers', 'risks', 'reasoning', 'forecast']
   };
 
   // Compile all context
@@ -266,20 +312,25 @@ export const runJudgeAgent = async (
     industryReport: industry,
     newsReport: news,
     quantReport: quant,
-    competitorReport: competitor,
-    debateSummary: debate.conclusion,
-    riskManagement: hedging
+    competitorReport: competitor || "Data unavailable",
+    debateSummary: debate?.conclusion || "Data unavailable",
+    riskManagement: hedging || "Data unavailable",
+    backtestRealityCheck: backtest || "Data unavailable"
   }, null, 2);
 
   const prompt = `Synthesize all agent reports for ${stock.ticker} into a final decision.
+  
+  CRITICAL INPUT:
+  The "Backtest Agent" has provided lessons from a 3-month lookback. You MUST use these lessons to adjust your confidence and forecast. If the backtest shows we are historically too optimistic, LOWER your target price.
   
   CONTEXT:
   ${contextJSON}
   
   TASKS:
-  1. Weigh conflicting signals.
-  2. Decide Buy/Hold/Avoid.
-  3. Generate a Price Forecast (Target, Bull Case, Bear Case).
+  1. Determine what is "Priced In" (Market Consensus).
+  2. Determine your "Unique Insight" (Alpha).
+  3. Decide Buy/Hold/Avoid (3-Month Horizon).
+  4. Generate a Price Forecast (Target, Bull Case, Bear Case) for 3 MONTHS out.
   
   ${getLangInstruction(lang)}`;
 
@@ -287,6 +338,6 @@ export const runJudgeAgent = async (
     MODEL_REASONING, 
     prompt,
     schema,
-    "You are the CIO. You make the final call."
+    "You are the CIO. You make the final call based on data and historical lessons."
   );
 };

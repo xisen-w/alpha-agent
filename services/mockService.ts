@@ -6,6 +6,7 @@ import {
   CompetitorAgentOutput,
   DebateAgentOutput,
   HedgingAgentOutput,
+  BacktestAgentOutput,
   Decision, 
   Valuation, 
   Sentiment 
@@ -27,10 +28,11 @@ export const mockGenerateTypedResponse = async <T>(
   // Infer the agent type based on unique schema properties
   if (properties.sectorTrend) return getIndustryMock() as T;
   if (properties.sentiment) return getNewsMock() as T;
-  if (properties.trendSignal) return getQuantMock() as T; // Updated property check
+  if (properties.trendSignal) return getQuantMock() as T;
   if (properties.topCompetitors) return getCompetitorMock() as T;
   if (properties.primaryStrategy) return getHedgingMock() as T;
   if (properties.turns) return getDebateMock() as T;
+  if (properties.lessons) return getBacktestMock() as T; // Backtest
   if (properties.decision) return getJudgeMock() as T;
 
   throw new Error("Mock service could not determine response type from schema");
@@ -69,6 +71,19 @@ function getQuantMock(): QuantAgentOutput {
   };
 }
 
+function getBacktestMock(): BacktestAgentOutput {
+  return {
+    score: 75,
+    bias: getRandom(['Optimistic', 'Neutral', 'Pessimistic']),
+    lessons: [
+      "We underestimated the impact of interest rate hikes on valuation multiples.",
+      "Revenue growth persistence was overestimated in the previous quarter.",
+      "The market reacted more negatively to regulatory news than fundamentally justified."
+    ],
+    pastPrediction: "Bullish divergence not confirmed by volume."
+  };
+}
+
 function getJudgeMock(): JudgeOutput {
   const decision = getRandom([Decision.BUY, Decision.HOLD, Decision.AVOID, Decision.WATCH]);
   const currentPrice = 145.50;
@@ -76,6 +91,8 @@ function getJudgeMock(): JudgeOutput {
     decision: decision,
     confidence: 0.6 + Math.random() * 0.3, // 0.6 - 0.9
     valuation: getRandom([Valuation.UNDERPRICED, Valuation.FAIR, Valuation.OVERPRICED]),
+    marketConsensus: "The market has fully priced in the recent earnings beat and expects 10% growth.",
+    uniqueInsight: "Our models suggest the market is underestimating the margin expansion from the new AI vertical, which acts as a hidden catalyst.",
     keyDrivers: [
       "Strong earnings momentum",
       "Favorable industry tailwinds",

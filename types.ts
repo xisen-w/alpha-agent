@@ -30,8 +30,8 @@ export interface AgentResponse {
 
 export interface IndustryAgentOutput {
   sectorTrend: 'Bullish' | 'Neutral' | 'Bearish';
-  marketOutlook: string; // Broader market context (e.g., S&P500 or HSI)
-  industryGrowth: string; // New: Specific sub-sector analysis (e.g., "EV demand in China +20% YoY")
+  marketOutlook: string; 
+  industryGrowth: string; 
   regulatoryRisk: 'Low' | 'Medium' | 'High';
   summary: string;
 }
@@ -43,21 +43,23 @@ export interface NewsAgentOutput {
   summary: string;
 }
 
-// Refactored to the "Dominant Metrics" philosophy
 export interface QuantAgentOutput {
   currentPrice: number;
-  // 1. Trend Strength (Primary Driver)
   trendSignal: 'Strong Uptrend' | 'Weak Uptrend' | 'Neutral' | 'Downtrend';
-  // 2. Volatility / Stability (Risk Filter)
   volatilitySignal: 'Low (Stable)' | 'Medium' | 'High (Risky)';
-  // 3. Volume Confirmation (Truth Serum)
   volumeSignal: 'High (Confirmed)' | 'Neutral' | 'Low (Diverging)';
-  // 4. Valuation Sanity Check
   valuationSignal: 'Cheap' | 'Fair' | 'Expensive';
 }
 
+export interface BacktestAgentOutput {
+  score: number; // 0-100 how accurate the past model would have been
+  bias: 'Optimistic' | 'Pessimistic' | 'Neutral';
+  lessons: string[]; // The 3 lessons learned
+  pastPrediction: string;
+}
+
 export interface PriceForecast {
-  currentPrice: number; // Repeated for context
+  currentPrice: number;
   targetPrice: number;
   bullCase: number;
   bearCase: number;
@@ -66,15 +68,20 @@ export interface PriceForecast {
 
 export interface JudgeOutput {
   decision: Decision;
-  confidence: number; // 0-1
+  confidence: number;
   valuation: Valuation;
-  keyDrivers: string[];
-  risks: string[];
+  keyDrivers: string[]; // Keep for compatibility
+  risks: string[]; // Keep for compatibility
+  
+  // New "Priced In" vs "Alpha" Analysis
+  marketConsensus: string; // What everyone knows (Priced In)
+  uniqueInsight: string; // What we see that others don't (Alpha)
+  
   reasoning: string;
   forecast: PriceForecast;
 }
 
-// --- New Agent Types ---
+// --- Other Agent Types ---
 
 export interface CompetitorData {
   name: string;
@@ -121,8 +128,8 @@ export interface PipelineState {
   industry: AgentResponse;
   news: AgentResponse;
   quant: AgentResponse;
+  backtest: AgentResponse; // New
   judge: AgentResponse;
-  // New agents
   competitor: AgentResponse;
   debate: AgentResponse;
   hedging: AgentResponse;

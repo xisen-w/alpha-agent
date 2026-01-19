@@ -12,7 +12,8 @@ import {
   runJudgeAgent,
   runCompetitorAgent,
   runDebateAgent,
-  runHedgingAgent
+  runHedgingAgent,
+  runBacktestAgent
 } from './agents';
 
 const INITIAL_AGENT_STATE: AgentResponse = {
@@ -21,7 +22,10 @@ const INITIAL_AGENT_STATE: AgentResponse = {
   timestamp: 0
 };
 
-type AgentKey = 'industry' | 'news' | 'quant' | 'judge' | 'competitor' | 'debate' | 'hedging';
+type AgentKey = 'industry' | 'news' | 'quant' | 'judge' | 'competitor' | 'debate' | 'hedging' | 'backtest';
+
+// Helper to prevent rate limiting
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const useAgentOrchestrator = () => {
   const [state, setState] = useState<PipelineState>({
@@ -33,6 +37,7 @@ export const useAgentOrchestrator = () => {
     competitor: { ...INITIAL_AGENT_STATE, agentName: 'Competitor Agent' },
     debate: { ...INITIAL_AGENT_STATE, agentName: 'Debate Agent' },
     hedging: { ...INITIAL_AGENT_STATE, agentName: 'Risk Agent' },
+    backtest: { ...INITIAL_AGENT_STATE, agentName: 'Backtest Agent' },
     judge: { ...INITIAL_AGENT_STATE, agentName: 'Judge Agent', status: 'pending' },
   });
 
@@ -46,6 +51,7 @@ export const useAgentOrchestrator = () => {
       competitor: { ...INITIAL_AGENT_STATE, agentName: 'Competitor Agent', status: 'pending' },
       debate: { ...INITIAL_AGENT_STATE, agentName: 'Debate Agent', status: 'pending' },
       hedging: { ...INITIAL_AGENT_STATE, agentName: 'Risk Agent', status: 'pending' },
+      backtest: { ...INITIAL_AGENT_STATE, agentName: 'Backtest Agent', status: 'pending' },
       judge: { ...INITIAL_AGENT_STATE, agentName: 'Judge Agent', status: 'pending' },
     });
   };
@@ -62,8 +68,9 @@ export const useAgentOrchestrator = () => {
     resetState(stock);
 
     try {
-      // 1. Parallel Execution of Independent Agents
-      const [industryRes, newsRes, quantRes, compRes, debateRes, hedgeRes] = await Promise.allSettled([
+      // PHASE 1: CRITICAL SIGNAL AGENTS (Parallel)
+      // These act as the foundation for the Judge
+      const criticalPromise = Promise.allSettled([
         runIndustryAgent(stock, lang).then(data => {
             updateAgent('industry', { status: 'success', data });
             return data;
@@ -84,59 +91,90 @@ export const useAgentOrchestrator = () => {
         }).catch(err => {
             updateAgent('quant', { status: 'error', error: err.message });
             throw err;
-        }),
+        })
+      ]);
+
+      // PHASE 2: SECONDARY AGENTS (Staggered to avoid Rate Limits)
+      // We start these slightly later
+      await delay(800); 
+      
+      const secondaryPromise = Promise.allSettled([
         runCompetitorAgent(stock, lang).then(data => {
             updateAgent('competitor', { status: 'success', data });
             return data;
         }).catch(err => {
             updateAgent('competitor', { status: 'error', error: err.message });
-            throw err;
-        }),
-        runDebateAgent(stock, lang).then(data => {
-            updateAgent('debate', { status: 'success', data });
-            return data;
-        }).catch(err => {
-            updateAgent('debate', { status: 'error', error: err.message });
-            throw err;
+            return null; // Optional agent, return null on fail
         }),
         runHedgingAgent(stock, lang).then(data => {
             updateAgent('hedging', { status: 'success', data });
             return data;
         }).catch(err => {
             updateAgent('hedging', { status: 'error', error: err.message });
-            throw err;
+            return null; // Optional
         })
       ]);
 
-      // 2. Check if all agents succeeded to provide full context to Judge
-      const allSucceeded = 
-        industryRes.status === 'fulfilled' && 
-        newsRes.status === 'fulfilled' && 
-        quantRes.status === 'fulfilled' &&
-        compRes.status === 'fulfilled' &&
-        debateRes.status === 'fulfilled' &&
-        hedgeRes.status === 'fulfilled';
+      // PHASE 3: HEAVY LIFTING AGENTS (Debate & Backtest)
+      // These are computationally expensive, so we run them last
+      await delay(800);
 
-      if (allSucceeded) {
-        // 3. Run Judge Agent with FULL context
+      const heavyPromise = Promise.allSettled([
+        runDebateAgent(stock, lang).then(data => {
+            updateAgent('debate', { status: 'success', data });
+            return data;
+        }).catch(err => {
+            updateAgent('debate', { status: 'error', error: err.message });
+            return null;
+        }),
+        runBacktestAgent(stock, lang).then(data => {
+            updateAgent('backtest', { status: 'success', data });
+            return data;
+        }).catch(err => {
+            updateAgent('backtest', { status: 'error', error: err.message });
+            return null;
+        })
+      ]);
+
+      // Wait for everything to finish
+      const [criticalResults, secondaryResults, heavyResults] = await Promise.all([
+          criticalPromise,
+          secondaryPromise,
+          heavyPromise
+      ]);
+
+      // Extract results safely
+      const industry = criticalResults[0].status === 'fulfilled' ? criticalResults[0].value : null;
+      const news = criticalResults[1].status === 'fulfilled' ? criticalResults[1].value : null;
+      const quant = criticalResults[2].status === 'fulfilled' ? criticalResults[2].value : null;
+
+      const competitor = secondaryResults[0].status === 'fulfilled' ? secondaryResults[0].value : null;
+      const hedging = secondaryResults[1].status === 'fulfilled' ? secondaryResults[1].value : null;
+
+      const debate = heavyResults[0].status === 'fulfilled' ? heavyResults[0].value : null;
+      const backtest = heavyResults[1].status === 'fulfilled' ? heavyResults[1].value : null;
+
+
+      // JUDGE: Requires at least the Critical Signals to proceed
+      if (industry && news && quant) {
         try {
             const judgeData = await runJudgeAgent(
                 stock, 
-                industryRes.value, 
-                newsRes.value, 
-                quantRes.value,
-                compRes.value,
-                debateRes.value,
-                hedgeRes.value,
+                industry, 
+                news, 
+                quant,
+                competitor,
+                debate,
+                hedging,
+                backtest,
                 lang
             );
             updateAgent('judge', { status: 'success', data: judgeData });
         } catch (err: any) {
             updateAgent('judge', { status: 'error', error: err.message });
         }
-
       } else {
-          updateAgent('judge', { status: 'error', error: 'One or more dependency agents failed. Synthesis aborted.' });
+          updateAgent('judge', { status: 'error', error: 'Critical agents failed. Synthesis aborted.' });
       }
 
     } catch (error) {
