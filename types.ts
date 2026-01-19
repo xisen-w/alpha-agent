@@ -30,7 +30,8 @@ export interface AgentResponse {
 
 export interface IndustryAgentOutput {
   sectorTrend: 'Bullish' | 'Neutral' | 'Bearish';
-  marketOutlook: string; // New: Broader market context (e.g., S&P500 or HSI)
+  marketOutlook: string; // Broader market context (e.g., S&P500 or HSI)
+  industryGrowth: string; // New: Specific sub-sector analysis (e.g., "EV demand in China +20% YoY")
   regulatoryRisk: 'Low' | 'Medium' | 'High';
   summary: string;
 }

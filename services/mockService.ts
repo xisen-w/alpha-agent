@@ -39,7 +39,8 @@ export const mockGenerateTypedResponse = async <T>(
 function getIndustryMock(): IndustryAgentOutput {
   return {
     sectorTrend: getRandom(['Bullish', 'Neutral', 'Bearish']),
-    marketOutlook: "The broader market index is consolidating near all-time highs, though inflation data suggests caution.",
+    marketOutlook: "The broader market index (S&P 500) is consolidating near all-time highs, though inflation data suggests caution.",
+    industryGrowth: "The cloud computing sub-sector is projected to grow 18% YoY, driven by AI adoption.",
     regulatoryRisk: getRandom(['Low', 'Medium', 'High']),
     summary: "The industry is currently undergoing a structural shift driven by technological adoption. However, broad market volatility may limit near-term upside."
   };

@@ -29,18 +29,20 @@ export const runIndustryAgent = async (stock: StockContext, lang: Language): Pro
     properties: {
       sectorTrend: { type: Type.STRING, enum: ['Bullish', 'Neutral', 'Bearish'] },
       marketOutlook: { type: Type.STRING },
+      industryGrowth: { type: Type.STRING },
       regulatoryRisk: { type: Type.STRING, enum: ['Low', 'Medium', 'High'] },
       summary: { type: Type.STRING },
     },
-    required: ['sectorTrend', 'marketOutlook', 'regulatoryRisk', 'summary']
+    required: ['sectorTrend', 'marketOutlook', 'industryGrowth', 'regulatoryRisk', 'summary']
   };
 
   const prompt = `Analyze the industry and broader market outlook for ${stock.ticker}. 
-  1. Identify the specific sector.
-  2. IDENTIFY THE RELEVANT BROAD MARKET INDEX based on the ticker.
-  3. Analyze the current trend of that broad market index.
-  4. Assess specific regulatory risks.
-  5. Provide a summary combining the sector trend AND the broad market backdrop.
+  1. Identify the specific sub-sector (e.g., "EVs in China" or "Cloud Computing in US").
+  2. IDENTIFY THE RELEVANT BROAD MARKET INDEX (e.g., S&P 500, HSI).
+  3. Analyze the current trend of that BROAD market index.
+  4. Analyze the SPECIFIC INDUSTRY growth dynamics (e.g., market size, CAGR, demand drivers, saturation).
+  5. Assess specific regulatory risks.
+  6. Provide a summary combining the broad market backdrop and specific industry dynamics.
   
   ${getLangInstruction(lang)}`;
 

@@ -40,12 +40,19 @@ const AgentCard: React.FC<AgentCardProps> = ({ type, data }) => {
               </span>
             </div>
             
-             <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800">
-                  <div className="text-xs text-slate-500 mb-1 uppercase">Broad Market Context</div>
-                  <p className="text-slate-300 leading-snug text-xs">{data.data.marketOutlook}</p>
+             <div className="space-y-2">
+                <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-500 mb-1 uppercase tracking-wider">Macro: Broad Market</div>
+                    <p className="text-slate-300 leading-snug text-xs">{data.data.marketOutlook}</p>
+                </div>
+                
+                <div className="p-3 bg-blue-900/10 rounded-lg border border-blue-500/20">
+                    <div className="text-xs text-blue-400 mb-1 uppercase tracking-wider">Micro: Specific Industry</div>
+                    <p className="text-slate-300 leading-snug text-xs">{data.data.industryGrowth}</p>
+                </div>
              </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 mt-2">
                <div>
                   <div className="text-xs text-slate-500 mb-1">REGULATORY RISK</div>
                   <div className={`font-medium ${data.data.regulatoryRisk === 'High' ? 'text-rose-400' : 'text-slate-200'}`}>{data.data.regulatoryRisk}</div>
