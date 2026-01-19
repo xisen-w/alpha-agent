@@ -4,43 +4,57 @@ import {
   NewsAgentOutput, 
   QuantAgentOutput, 
   JudgeOutput, 
+  CompetitorAgentOutput,
+  DebateAgentOutput,
+  HedgingAgentOutput,
   StockContext,
   Decision,
   Valuation,
-  Sentiment
+  Sentiment,
+  Language
 } from "../types";
 import { generateTypedResponse, MODEL_FAST, MODEL_REASONING } from "./geminiService";
 
+// Helper for language instructions
+const getLangInstruction = (lang: Language) => {
+  return lang === 'CN' 
+    ? "IMPORTANT: You MUST generate all free-text summaries, descriptions, and reasoning in SIMPLIFIED CHINESE. However, keep all ENUM values (e.g., 'Bullish', 'BUY', 'Strong Uptrend') strictly in ENGLISH to match the schema."
+    : "Generate the response in English.";
+};
+
 // --- Industry Agent ---
-export const runIndustryAgent = async (stock: StockContext): Promise<IndustryAgentOutput> => {
+export const runIndustryAgent = async (stock: StockContext, lang: Language): Promise<IndustryAgentOutput> => {
   const schema = {
     type: Type.OBJECT,
     properties: {
       sectorTrend: { type: Type.STRING, enum: ['Bullish', 'Neutral', 'Bearish'] },
-      macroOutlook: { type: Type.STRING },
+      marketOutlook: { type: Type.STRING },
       regulatoryRisk: { type: Type.STRING, enum: ['Low', 'Medium', 'High'] },
       summary: { type: Type.STRING },
     },
-    required: ['sectorTrend', 'macroOutlook', 'regulatoryRisk', 'summary']
+    required: ['sectorTrend', 'marketOutlook', 'regulatoryRisk', 'summary']
   };
 
-  const prompt = `Analyze the industry outlook for ${stock.ticker}. 
-  Identify the sector it belongs to.
-  Assess macro trends affecting this sector (inflation, rates, growth).
-  Identify any specific regulatory risks (especially if China/HK market).
-  Provide a concise summary.`;
+  const prompt = `Analyze the industry and broader market outlook for ${stock.ticker}. 
+  1. Identify the specific sector.
+  2. IDENTIFY THE RELEVANT BROAD MARKET INDEX based on the ticker.
+  3. Analyze the current trend of that broad market index.
+  4. Assess specific regulatory risks.
+  5. Provide a summary combining the sector trend AND the broad market backdrop.
+  
+  ${getLangInstruction(lang)}`;
 
   return generateTypedResponse<IndustryAgentOutput>(
     MODEL_FAST,
     prompt,
     schema,
-    "You are a Senior Industry Strategy Analyst. You focus on macroeconomics, sector cycles, and regulatory environments.",
-    true // Use search to get real-time sector news
+    "You are a Senior Macro Strategist.",
+    true 
   );
 };
 
 // --- News Agent ---
-export const runNewsAgent = async (stock: StockContext): Promise<NewsAgentOutput> => {
+export const runNewsAgent = async (stock: StockContext, lang: Language): Promise<NewsAgentOutput> => {
   const schema = {
     type: Type.OBJECT,
     properties: {
@@ -55,42 +69,158 @@ export const runNewsAgent = async (stock: StockContext): Promise<NewsAgentOutput
   const prompt = `Search for the latest key news events for ${stock.ticker} in the last 30 days.
   Summarize the top 3 headlines.
   Determine the overall sentiment.
-  Estimate if these events have short-term or long-term impact.`;
+  
+  ${getLangInstruction(lang)}`;
 
   return generateTypedResponse<NewsAgentOutput>(
     MODEL_FAST,
     prompt,
     schema,
-    "You are a News Intelligence Officer. You scan global media for signals, ignoring noise and focusing on material events.",
-    true // Essential for news
+    "You are a News Intelligence Officer.",
+    true 
   );
 };
 
 // --- Quant Agent ---
-export const runQuantAgent = async (stock: StockContext): Promise<QuantAgentOutput> => {
+export const runQuantAgent = async (stock: StockContext, lang: Language): Promise<QuantAgentOutput> => {
   const schema = {
     type: Type.OBJECT,
     properties: {
-      priceTrend: { type: Type.STRING, enum: ['Uptrend', 'Sideways', 'Downtrend'] },
-      volatility: { type: Type.STRING, enum: ['Low', 'Medium', 'High'] },
-      valuationHeuristic: { type: Type.STRING, enum: [Valuation.UNDERPRICED, Valuation.FAIR, Valuation.OVERPRICED, Valuation.UNKNOWN] },
-      keyLevels: { type: Type.STRING },
+      currentPrice: { type: Type.NUMBER },
+      trendSignal: { type: Type.STRING, enum: ['Strong Uptrend', 'Weak Uptrend', 'Neutral', 'Downtrend'] },
+      volatilitySignal: { type: Type.STRING, enum: ['Low (Stable)', 'Medium', 'High (Risky)'] },
+      volumeSignal: { type: Type.STRING, enum: ['High (Confirmed)', 'Neutral', 'Low (Diverging)'] },
+      valuationSignal: { type: Type.STRING, enum: ['Cheap', 'Fair', 'Expensive'] }
     },
-    required: ['priceTrend', 'volatility', 'valuationHeuristic', 'keyLevels']
+    required: ['currentPrice', 'trendSignal', 'volatilitySignal', 'volumeSignal', 'valuationSignal']
   };
 
-  const prompt = `Find recent price data, P/E ratio, and market cap for ${stock.ticker}.
-  Analyze the price trend (approximate based on recent data).
-  Estimate volatility.
-  Provide a heuristic valuation (Under/Fair/Over) based on historical averages for its sector.
-  Identify key support/resistance levels if mentioned in search results.`;
+  const prompt = `Perform a technical and quantitative audit on ${stock.ticker} focusing on 4 Dominant Metrics. 
+  
+  1. TREND STRENGTH: Compare Current Price to 50-Day MA.
+  2. VOLATILITY: Check Beta or daily range.
+  3. VOLUME: Check participation.
+  4. VALUATION: Check P/E vs history.
+
+  ${getLangInstruction(lang)}`;
 
   return generateTypedResponse<QuantAgentOutput>(
-    MODEL_FAST, // Using fast model with search to simulate quant data retrieval
+    MODEL_FAST,
     prompt,
     schema,
-    "You are a Quantitative Analyst. You look at price action, volume (liquidity), and relative valuation metrics.",
+    "You are a Disciplined Quantitative Trader.",
     true
+  );
+};
+
+// --- Competitor Agent ---
+export const runCompetitorAgent = async (stock: StockContext, lang: Language): Promise<CompetitorAgentOutput> => {
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      topCompetitors: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            ticker: { type: Type.STRING },
+            comparison: { type: Type.STRING }
+          }
+        }
+      },
+      marketPosition: { type: Type.STRING, enum: ['Leader', 'Challenger', 'Laggard', 'Niche Player'] }
+    },
+    required: ['topCompetitors', 'marketPosition']
+  };
+
+  const prompt = `Identify top 3 competitors for ${stock.ticker}. 
+  For each competitor, provide their name, ticker, and a 1-sentence comparison.
+  Determine ${stock.ticker}'s overall market position.
+  
+  ${getLangInstruction(lang)}`;
+
+  return generateTypedResponse<CompetitorAgentOutput>(
+    MODEL_FAST,
+    prompt,
+    schema,
+    "You are a Competitive Intelligence Specialist.",
+    true
+  );
+};
+
+// --- Hedging Agent ---
+export const runHedgingAgent = async (stock: StockContext, lang: Language): Promise<HedgingAgentOutput> => {
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      primaryStrategy: {
+        type: Type.OBJECT,
+        properties: {
+          type: { type: Type.STRING },
+          description: { type: Type.STRING },
+          cost: { type: Type.STRING, enum: ['Low', 'Medium', 'High'] }
+        }
+      },
+      alternativeStrategy: {
+        type: Type.OBJECT,
+        properties: {
+          type: { type: Type.STRING },
+          description: { type: Type.STRING },
+          cost: { type: Type.STRING, enum: ['Low', 'Medium', 'High'] }
+        }
+      },
+      rationale: { type: Type.STRING }
+    },
+    required: ['primaryStrategy', 'alternativeStrategy', 'rationale']
+  };
+
+  const prompt = `Suggest a hedging strategy for a long position in ${stock.ticker}.
+  Provide a primary and alternative strategy.
+  
+  ${getLangInstruction(lang)}`;
+
+  return generateTypedResponse<HedgingAgentOutput>(
+    MODEL_REASONING,
+    prompt,
+    schema,
+    "You are a Risk Manager.",
+    false // No search needed for general hedging theory usually, but could be enabled. Keeping false for speed/reasoning.
+  );
+};
+
+// --- Debate Agent ---
+export const runDebateAgent = async (stock: StockContext, lang: Language): Promise<DebateAgentOutput> => {
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      topic: { type: Type.STRING },
+      turns: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            speaker: { type: Type.STRING, enum: ['Bull', 'Bear'] },
+            argument: { type: Type.STRING }
+          }
+        }
+      },
+      conclusion: { type: Type.STRING }
+    },
+    required: ['topic', 'turns', 'conclusion']
+  };
+
+  const prompt = `Simulate a short intense debate between a Bull (optimist) and a Bear (skeptic) regarding ${stock.ticker}.
+  Topic: Is ${stock.ticker} a good buy right now?
+  The debate should have 4 turns.
+  
+  ${getLangInstruction(lang)}`;
+
+  return generateTypedResponse<DebateAgentOutput>(
+    MODEL_REASONING,
+    prompt,
+    schema,
+    "You are a debate simulator."
   );
 };
 
@@ -99,7 +229,11 @@ export const runJudgeAgent = async (
   stock: StockContext,
   industry: IndustryAgentOutput,
   news: NewsAgentOutput,
-  quant: QuantAgentOutput
+  quant: QuantAgentOutput,
+  competitor: CompetitorAgentOutput,
+  debate: DebateAgentOutput,
+  hedging: HedgingAgentOutput,
+  lang: Language
 ): Promise<JudgeOutput> => {
   const schema = {
     type: Type.OBJECT,
@@ -110,30 +244,47 @@ export const runJudgeAgent = async (
       keyDrivers: { type: Type.ARRAY, items: { type: Type.STRING } },
       risks: { type: Type.ARRAY, items: { type: Type.STRING } },
       reasoning: { type: Type.STRING },
+      forecast: {
+        type: Type.OBJECT,
+        properties: {
+          currentPrice: { type: Type.NUMBER },
+          targetPrice: { type: Type.NUMBER },
+          bullCase: { type: Type.NUMBER },
+          bearCase: { type: Type.NUMBER },
+          timeframe: { type: Type.STRING }
+        },
+        required: ['currentPrice', 'targetPrice', 'bullCase', 'bearCase', 'timeframe']
+      }
     },
-    required: ['decision', 'confidence', 'valuation', 'keyDrivers', 'risks', 'reasoning']
+    required: ['decision', 'confidence', 'valuation', 'keyDrivers', 'risks', 'reasoning', 'forecast']
   };
 
+  // Compile all context
   const contextJSON = JSON.stringify({
     industryReport: industry,
     newsReport: news,
-    quantReport: quant
+    quantReport: quant,
+    competitorReport: competitor,
+    debateSummary: debate.conclusion,
+    riskManagement: hedging
   }, null, 2);
 
-  const prompt = `Synthesize the following agent reports for ${stock.ticker} and make a final trading decision.
+  const prompt = `Synthesize all agent reports for ${stock.ticker} into a final decision.
   
-  AGENTS INPUT:
+  CONTEXT:
   ${contextJSON}
   
-  REQUIREMENTS:
-  1. Weigh conflicting signals (e.g., good quant but bad regulatory risk).
-  2. If uncertainty is high, lower confidence and choose WATCH or HOLD.
-  3. Be decisive but prudent.`;
+  TASKS:
+  1. Weigh conflicting signals.
+  2. Decide Buy/Hold/Avoid.
+  3. Generate a Price Forecast (Target, Bull Case, Bear Case).
+  
+  ${getLangInstruction(lang)}`;
 
   return generateTypedResponse<JudgeOutput>(
-    MODEL_REASONING, // Use the stronger model for the final synthesis
+    MODEL_REASONING, 
     prompt,
     schema,
-    "You are the Chief Investment Officer (CIO). You synthesize multi-agent intelligence into actionable decisions. You are skeptical, risk-aware, and data-driven."
+    "You are the CIO. You make the final call."
   );
 };

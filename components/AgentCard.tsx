@@ -1,6 +1,6 @@
 import React from 'react';
 import { AgentResponse } from '../types';
-import { Activity, Globe, TrendingUp, Gavel, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Activity, Globe, TrendingUp, Gavel, AlertCircle, CheckCircle2, Loader2, BarChart3, Zap, Scale, DollarSign } from 'lucide-react';
 
 interface AgentCardProps {
   type: 'industry' | 'news' | 'quant' | 'judge';
@@ -39,13 +39,18 @@ const AgentCard: React.FC<AgentCardProps> = ({ type, data }) => {
                 {data.data.sectorTrend}
               </span>
             </div>
+            
+             <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800">
+                  <div className="text-xs text-slate-500 mb-1 uppercase">Broad Market Context</div>
+                  <p className="text-slate-300 leading-snug text-xs">{data.data.marketOutlook}</p>
+             </div>
+
             <div className="grid grid-cols-2 gap-4">
                <div>
                   <div className="text-xs text-slate-500 mb-1">REGULATORY RISK</div>
                   <div className={`font-medium ${data.data.regulatoryRisk === 'High' ? 'text-rose-400' : 'text-slate-200'}`}>{data.data.regulatoryRisk}</div>
                </div>
             </div>
-            <p className="text-slate-300 leading-relaxed text-xs">{data.data.summary}</p>
           </div>
         );
       case 'news':
@@ -68,27 +73,53 @@ const AgentCard: React.FC<AgentCardProps> = ({ type, data }) => {
         );
       case 'quant':
         return (
-          <div className="space-y-3 mt-4 text-sm">
-            <div className="flex justify-between items-center border-b border-slate-700 pb-2">
-              <span className="text-slate-400">Price Trend</span>
-              <span className={`font-mono ${data.data.priceTrend === 'Uptrend' ? 'text-emerald-400' : data.data.priceTrend === 'Downtrend' ? 'text-rose-400' : 'text-slate-200'}`}>
-                {data.data.priceTrend}
-              </span>
-            </div>
-             <div className="grid grid-cols-2 gap-4">
-               <div>
-                  <div className="text-xs text-slate-500 mb-1">VALUATION</div>
-                  <div className="font-medium text-slate-200">{data.data.valuationHeuristic}</div>
-               </div>
-               <div>
-                  <div className="text-xs text-slate-500 mb-1">VOLATILITY</div>
-                  <div className="font-medium text-slate-200">{data.data.volatility}</div>
-               </div>
-            </div>
-             <div className="text-xs text-slate-400">
-                <span className="text-slate-500 mr-2">LEVELS:</span>
-                {data.data.keyLevels}
-            </div>
+          <div className="space-y-4 mt-4 text-sm">
+             {/* 1. Trend */}
+             <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-slate-500" />
+                    <span className="text-slate-300">Trend</span>
+                </div>
+                <span className={`font-mono font-medium ${
+                    data.data.trendSignal.includes('Strong Uptrend') ? 'text-emerald-400' : 
+                    data.data.trendSignal.includes('Downtrend') ? 'text-rose-400' : 'text-slate-400'
+                }`}>{data.data.trendSignal}</span>
+             </div>
+
+             {/* 2. Volatility */}
+             <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-slate-500" />
+                    <span className="text-slate-300">Volatility</span>
+                </div>
+                <span className={`font-mono font-medium ${
+                    data.data.volatilitySignal.includes('Low') ? 'text-emerald-400' : 
+                    data.data.volatilitySignal.includes('High') ? 'text-rose-400' : 'text-amber-400'
+                }`}>{data.data.volatilitySignal}</span>
+             </div>
+
+             {/* 3. Volume */}
+             <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-slate-500" />
+                    <span className="text-slate-300">Volume</span>
+                </div>
+                <span className={`font-mono font-medium ${
+                    data.data.volumeSignal.includes('High') ? 'text-emerald-400' : 'text-slate-400'
+                }`}>{data.data.volumeSignal}</span>
+             </div>
+
+             {/* 4. Valuation */}
+             <div className="flex justify-between items-center border-t border-slate-800 pt-3">
+                <div className="flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-slate-500" />
+                    <span className="text-slate-300">Valuation</span>
+                </div>
+                <span className={`font-mono font-medium ${
+                    data.data.valuationSignal === 'Cheap' ? 'text-emerald-400' : 
+                    data.data.valuationSignal === 'Expensive' ? 'text-rose-400' : 'text-slate-400'
+                }`}>{data.data.valuationSignal}</span>
+             </div>
           </div>
         );
       default:

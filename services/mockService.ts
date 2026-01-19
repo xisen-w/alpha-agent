@@ -3,6 +3,9 @@ import {
   NewsAgentOutput, 
   QuantAgentOutput, 
   JudgeOutput, 
+  CompetitorAgentOutput,
+  DebateAgentOutput,
+  HedgingAgentOutput,
   Decision, 
   Valuation, 
   Sentiment 
@@ -22,18 +25,13 @@ export const mockGenerateTypedResponse = async <T>(
   const properties = schema?.properties || {};
 
   // Infer the agent type based on unique schema properties
-  if (properties.sectorTrend) {
-    return getIndustryMock() as T;
-  }
-  if (properties.sentiment) {
-    return getNewsMock() as T;
-  }
-  if (properties.priceTrend) {
-    return getQuantMock() as T;
-  }
-  if (properties.decision) {
-    return getJudgeMock() as T;
-  }
+  if (properties.sectorTrend) return getIndustryMock() as T;
+  if (properties.sentiment) return getNewsMock() as T;
+  if (properties.trendSignal) return getQuantMock() as T; // Updated property check
+  if (properties.topCompetitors) return getCompetitorMock() as T;
+  if (properties.primaryStrategy) return getHedgingMock() as T;
+  if (properties.turns) return getDebateMock() as T;
+  if (properties.decision) return getJudgeMock() as T;
 
   throw new Error("Mock service could not determine response type from schema");
 };
@@ -41,13 +39,9 @@ export const mockGenerateTypedResponse = async <T>(
 function getIndustryMock(): IndustryAgentOutput {
   return {
     sectorTrend: getRandom(['Bullish', 'Neutral', 'Bearish']),
-    macroOutlook: getRandom([
-      "Inflation pressures are easing, creating a favorable environment for growth stocks.",
-      "Rising interest rates continue to put pressure on valuations in this sector.",
-      "Global supply chain improvements are boosting margins across the industry."
-    ]),
+    marketOutlook: "The broader market index is consolidating near all-time highs, though inflation data suggests caution.",
     regulatoryRisk: getRandom(['Low', 'Medium', 'High']),
-    summary: "The industry is currently undergoing a structural shift driven by technological adoption and changing consumer preferences. Key players are consolidating market share."
+    summary: "The industry is currently undergoing a structural shift driven by technological adoption. However, broad market volatility may limit near-term upside."
   };
 }
 
@@ -66,15 +60,17 @@ function getNewsMock(): NewsAgentOutput {
 
 function getQuantMock(): QuantAgentOutput {
   return {
-    priceTrend: getRandom(['Uptrend', 'Sideways', 'Downtrend']),
-    volatility: getRandom(['Low', 'Medium', 'High']),
-    valuationHeuristic: getRandom([Valuation.UNDERPRICED, Valuation.FAIR, Valuation.OVERPRICED]),
-    keyLevels: "Support at $142.50, Resistance at $155.00"
+    currentPrice: 150.25 + Math.random() * 10,
+    trendSignal: getRandom(['Strong Uptrend', 'Weak Uptrend', 'Neutral', 'Downtrend']),
+    volatilitySignal: getRandom(['Low (Stable)', 'Medium', 'High (Risky)']),
+    volumeSignal: getRandom(['High (Confirmed)', 'Neutral', 'Low (Diverging)']),
+    valuationSignal: getRandom(['Cheap', 'Fair', 'Expensive']),
   };
 }
 
 function getJudgeMock(): JudgeOutput {
   const decision = getRandom([Decision.BUY, Decision.HOLD, Decision.AVOID, Decision.WATCH]);
+  const currentPrice = 145.50;
   return {
     decision: decision,
     confidence: 0.6 + Math.random() * 0.3, // 0.6 - 0.9
@@ -88,6 +84,53 @@ function getJudgeMock(): JudgeOutput {
       "Macroeconomic volatility",
       "Potential regulatory headwinds"
     ],
-    reasoning: `Based on the synthesis of all agents, the stock presents a ${decision} opportunity. The technicals align with the fundamental outlook, though caution is warranted due to external market factors.`
+    reasoning: `Based on the synthesis of all agents, the stock presents a ${decision} opportunity. The technicals align with the fundamental outlook, though caution is warranted due to external market factors.`,
+    forecast: {
+      currentPrice: currentPrice,
+      targetPrice: currentPrice * 1.15,
+      bullCase: currentPrice * 1.3,
+      bearCase: currentPrice * 0.85,
+      timeframe: "3 Months"
+    }
+  };
+}
+
+function getCompetitorMock(): CompetitorAgentOutput {
+  return {
+    topCompetitors: [
+      { name: "MegaCorp Inc", ticker: "MCORP", comparison: "Larger market cap, slower growth" },
+      { name: "InnovateTech", ticker: "INNO", comparison: "Higher valuation, better margins" },
+      { name: "Legacy Systems", ticker: "LGCY", comparison: "Value play, high dividend yield" }
+    ],
+    marketPosition: getRandom(['Leader', 'Challenger', 'Niche Player'])
+  };
+}
+
+function getHedgingMock(): HedgingAgentOutput {
+  return {
+    primaryStrategy: {
+      type: "Protective Put",
+      description: "Buy OTM put options to limit downside risk while maintaining upside potential.",
+      cost: "Medium"
+    },
+    alternativeStrategy: {
+      type: "Covered Call",
+      description: "Sell OTM call options to generate income and offset potential minor losses.",
+      cost: "Low"
+    },
+    rationale: "Given the current high implied volatility, a protective put offers the best insurance against a sharp downturn, though a covered call might be preferred if the outlook is strictly neutral."
+  };
+}
+
+function getDebateMock(): DebateAgentOutput {
+  return {
+    topic: "Is the stock a buy at current levels?",
+    turns: [
+      { speaker: "Bull", argument: "The company's new AI initiative is driving margin expansion faster than the market realizes. Forward P/E is attractive." },
+      { speaker: "Bear", argument: "That growth is already priced in. You are ignoring the regulatory cloud hanging over their biggest market." },
+      { speaker: "Bull", argument: "Regulation is a known known. The balance sheet is fortress-like, capable of weathering any fine." },
+      { speaker: "Bear", argument: "Cash flow is good, but user growth has stalled. Without new users, the multiple must compress." }
+    ],
+    conclusion: "The debate centers on whether recent growth initiatives can offset slowing user adoption and regulatory risks."
   };
 }
