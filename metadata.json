@@ -1,0 +1,5 @@
+{
+  "name": "AlphaAgent Core",
+  "description": "A multi-agent autonomous stock trading intelligence framework using Gemini 3.",
+  "requestFramePermissions": []
+}
